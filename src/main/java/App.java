@@ -1,3 +1,6 @@
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 
 /*
@@ -14,7 +17,72 @@ public class App {
 
     public String bestCharge(List<String> inputs) {
         //TODO: write code here
+        double moneySaved = 0;
+        double totalCost = 0;
+        List<String> promotionItemNames= new ArrayList();
+        String halfPricePromotionType = "50%_DISCOUNT_ON_SPECIFIED_ITEMS";
+        String saveSixYuanPromotionType = "BUY_30_SAVE_6_YUAN";
+        String resultString = "";
+        // Get Half price itemsIds first
+        // Here I assume there may be new types of promotion rather than the original two promotions
+        List<SalesPromotion> salesPromotions = salesPromotionRepository.findAll();
+        SalesPromotion halfPricePromotionDetails = salesPromotions.stream()
+                .filter(promotion -> promotion.getType().equals(halfPricePromotionType))
+                .findFirst()
+                .get();
+        SalesPromotion saveSixYuanPromotionDetails = salesPromotions.stream()
+                .filter(promotion -> promotion.getType().equals(saveSixYuanPromotionType))
+                .findFirst()
+                .get();
+        List<String> promotionItemIds = halfPricePromotionDetails.getRelatedItems();
 
-        return null;
+        resultString = resultString.concat("============= Order details =============\n");
+
+        // Order details
+        Iterator<String> inputsIterator = inputs.iterator();
+        while (inputsIterator.hasNext()) {
+            String[] inputDetails = inputsIterator.next().split(" x "); // [0] for itemId, [1] for itemCount
+            String inputId = inputDetails[0];
+            int inputCount = Integer.parseInt(inputDetails[1]);
+
+            //get order details
+            List<Item> items = itemRepository.findAll();
+
+            Item orderedItem = items.stream()
+                    .filter(item -> item.getId().equals(inputId))
+                    .findFirst()
+                    .get();
+            double itemTotalCost = orderedItem.getPrice() * inputCount;
+            totalCost += itemTotalCost;
+            resultString =  resultString.concat(String.format("%s x %d = %d yuan\n", orderedItem.getName(), inputCount, (int) itemTotalCost));
+
+            // calculate accumulated promotions
+            if (promotionItemIds.contains(inputId)) {
+                moneySaved += orderedItem.getPrice() / 2;
+                promotionItemNames.add(orderedItem.getName());
+            }
+        }
+        resultString = resultString.concat("-----------------------------------\n");
+
+        // Decide which promotion to use
+        if (moneySaved != 0) {
+            resultString = resultString.concat("Promotion used:\n");
+            if (totalCost >= 30) {
+                if (moneySaved > 6) {
+                    resultString = resultString.concat(String.format("%s (%s and %s), saving %d yuan\n", halfPricePromotionDetails.getDisplayName(), promotionItemNames.get(0), promotionItemNames.get(1), (int) moneySaved));
+                    totalCost -= moneySaved;
+                } else {
+                    resultString = resultString.concat(String.format("%s, saving 6 yuan\n", saveSixYuanPromotionDetails.getDisplayName()));
+                    totalCost -= 6;
+                }
+            }
+            resultString = resultString.concat("-----------------------------------\n");
+        }
+
+        //
+
+        resultString = resultString.concat(String.format("Total: %d yuan\n", (int) totalCost));
+        resultString = resultString.concat("===================================");
+        return resultString;
     }
 }
